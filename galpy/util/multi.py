@@ -30,159 +30,201 @@
 #THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 #(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#############################################################################
+# IMPORTS
+
 from __future__ import print_function
 import platform
-import numpy
-_multi=False
-_ncpus=1
+import numpy as np
+import time
 
 try:
-  # May raise ImportError
-  import multiprocessing
-  _multi=True
+    # May raise ImportError
+    import multiprocessing
 
-  # May raise NotImplementedError
-  _ncpus = multiprocessing.cpu_count()
-except:
-  pass
+except ImportError as e:
+    _multi = False
+else:
+    _multi = True
 
+try:
+    # May raise NotImplementedError
+    _ncpus = multiprocessing.cpu_count()
+except NotImplementedError as e:
+    _ncpus = 1
+
+# a progressbar
+try:
+    from tqdm import tqdm as TQDM
+except ImportError:
+    TQDM = lambda x, *args, **kw: x  # blanck TQDM
+
+#############################################################################
+# INFO
 
 __all__ = ('parallel_map',)
 
+#############################################################################
+# CODE
 
-def worker(f, ii, chunk, out_q, err_q, lock):
-  """
-  A worker function that maps an input function over a
-  slice of the input iterable.
 
-  :param f  : callable function that accepts argument from iterable
-  :param ii  : process ID
-  :param chunk: slice of input iterable
-  :param out_q: thread-safe output queue
-  :param err_q: thread-safe queue to populate on exception
-  :param lock : thread-safe lock to protect a resource
+def worker(func, ii, chunk, out_q, err_q, lock, tqdm=TQDM):
+    """
+    A worker function that maps an input function over a
+    slice of the input iterable.
+
+    :param func  : callable function that accepts argument from iterable
+    :param ii  : process ID
+    :param chunk: slice of input iterable
+    :param out_q: thread-safe output queue
+    :param err_q: thread-safe queue to populate on exception
+    :param lock : thread-safe lock to protect a resource
          ( useful in extending parallel_map() )
-  """
-  vals = []
+    :param tqdm : progressbar function, internally managed
+    """
+    # initializing
+    vals = []
+    sec = '\tWorker {}: len={}'.format(ii, len(chunk))
 
-  # iterate over slice 
-  for val in chunk:
+    # iterate over slice
+    for val in tqdm(chunk, leave=True, desc=sec):
+        try:
+            result = func(val)
+        except Exception as e:
+            err_q.put(e)
+            return
+
+        vals.append(result)
+
+    # output the result and task ID to output queue
+    out_q.put((ii, vals))
+# /def
+
+
+def run_tasks(procs, err_q, out_q, num, size, tqdm=TQDM):
+    """
+    A function that executes populated processes and processes
+    the resultant array. Checks error queue for any exceptions.
+
+    :param procs: list of Process objects
+    :param out_q: thread-safe output queue
+    :param err_q: thread-safe queue to populate on exception
+    :param num  : length of resultant array
+    :param size : size of iterable
+    :param tqdm : progressbar function, internally managed
+    :param tqdm : progressbar function, internally managed
+    """
+    # function to terminate processes that are still running.
+    die = (lambda vs: [v.terminate() for v in vs if v.exitcode is None])
+
     try:
-      result = f(val)
+        for proc in procs:  # starting processes
+            proc.start()
+
+        for proc in procs:  # ending the processes
+            proc.join()
+
     except Exception as e:
-      err_q.put(e)
-      return
+        # kill all slave processes on ctrl-C
+        try:
+            die(procs)
+        finally:
+            raise e
 
-    vals.append(result)
+    else:
+        pass
 
-  # output the result and task ID to output queue
-  out_q.put( (ii, vals) )
+    if not err_q.empty():
+        # kill all on any exception from any one slave
+        try:
+            die(procs)
+        finally:
 
+            raise err_q.get()
 
-def run_tasks(procs, err_q, out_q, num):
-  """
-  A function that executes populated processes and processes
-  the resultant array. Checks error queue for any exceptions.
+    # Processes finish in arbitrary order. Process IDs double
+    # as index in the resultant array.)
+    indices = np.array_split(np.arange(size), num)
+    results = np.empty(size, dtype=list)
+    # assigning values
+    while not out_q.empty():
+        idx, result = out_q.get()
+        results[indices[idx]] = result
 
-  :param procs: list of Process objects
-  :param out_q: thread-safe output queue
-  :param err_q: thread-safe queue to populate on exception
-  :param num : length of resultant array
-
-  """
-  # function to terminate processes that are still running.
-  die = (lambda vals : [val.terminate() for val in vals
-             if val.exitcode is None])
-
-  try:
-    for proc in procs:
-      proc.start()
-
-    for proc in procs:
-      proc.join()
-
-  except Exception as e:
-    # kill all slave processes on ctrl-C
-    try:
-      die(procs)
-    finally:
-      raise e
-
-  if not err_q.empty():
-    # kill all on any exception from any one slave
-    try:
-      die(procs)
-    finally:
-      raise err_q.get()
-
-  # Processes finish in arbitrary order. Process IDs double
-  # as index in the resultant array.
-  results=[None]*num;
-  while not out_q.empty():
-    idx, result = out_q.get()
-    results[idx] = result
-
-  # Remove extra dimension added by array_split
-  return list(numpy.concatenate(results))
+    return results
+# /def
 
 
-def parallel_map(function, sequence, numcores=None):
-  """
-  A parallelized version of the native Python map function that
-  utilizes the Python multiprocessing module to divide and 
-  conquer sequence.
+def parallel_map(function, sequence, func_args=[], func_kws={},
+                 numcores=None, _progressbar=False):
+    """
+    A parallelized version of the native Python map function that
+    utilizes the Python multiprocessing module to divide and
+    conquer sequence.
 
-  parallel_map does not yet support multiple argument sequences.
+    expanded to allow extra arguments to the function through:
+      func_args & func_kws
 
-  :param function: callable function that accepts argument from iterable
-  :param sequence: iterable sequence 
-  :param numcores: number of cores to use
-  """
-  if not callable(function):
-    raise TypeError("input function '%s' is not callable" %
-              repr(function))
+    :param function : callable function that accepts argument from iterable
+    :param sequence : iterable sequence
+    :param func_args: extra function arguments. not iterated over.
+    :param func_kws : extra function kwargs. not iterated over.
+    :param numcores : number of cores to use
+    :param _progressbar : whether to display the progressbar
+    """
+    if not callable(function):
+        raise TypeError(f"input function {function} is not callable")
 
-  if not numpy.iterable(sequence):
-    raise TypeError("input '%s' is not iterable" %
-              repr(sequence))
+    if not np.iterable(sequence):
+        raise TypeError(f"input {sequence} is not iterable")
 
-  size = len(sequence)
+    if _progressbar:
+        tqdm = TQDM
+    else:
+        tqdm = lambda x, *args, **kw: x
 
-  if not _multi or size == 1:
-    return map(function, sequence)
+    size = len(sequence)
 
-  if numcores is None:
-    numcores = _ncpus
+    func = lambda x: function(x, *func_args, **func_kws)  # @ NS
 
-  if platform.system() == 'Windows': # JB: don't think this works on Win
-    return list(map(function,sequence))
+    if not _multi or size == 1:
+        return map(func, sequence)
 
-  # Returns a started SyncManager object which can be used for sharing 
-  # objects between processes. The returned manager object corresponds
-  # to a spawned child process and has methods which will create shared
-  # objects and return corresponding proxies.
-  manager = multiprocessing.Manager()
+    if numcores is None:
+        numcores = _ncpus
 
-  # Create FIFO queue and lock shared objects and return proxies to them.
-  # The managers handles a server process that manages shared objects that
-  # each slave process has access to. Bottom line -- thread-safe.
-  out_q = manager.Queue()
-  err_q = manager.Queue()
-  lock = manager.Lock()
+    if platform.system() == 'Windows': # JB: don't think this works on Win
+        return list(map(func, sequence))
 
-  # if sequence is less than numcores, only use len sequence number of 
-  # processes
-  if size < numcores:
-    numcores = size 
+    # Returns a started SyncManager object which can be used for sharing
+    # objects between processes. The returned manager object corresponds
+    # to a spawned child process and has methods which will create shared
+    # objects and return corresponding proxies.
+    manager = multiprocessing.Manager()
 
-  # group sequence into numcores-worth of chunks
-  sequence = numpy.array_split(sequence, numcores)
+    # Create FIFO queue and lock shared objects and return proxies to them.
+    # The managers handles a server process that manages shared objects that
+    # each slave process has access to. Bottom line -- thread-safe.
+    out_q = manager.Queue()
+    err_q = manager.Queue()
+    lock = manager.Lock()
 
-  procs = [multiprocessing.Process(target=worker,
-           args=(function, ii, chunk, out_q, err_q, lock))
-         for ii, chunk in enumerate(sequence)]
+    # if sequence is less than numcores, only use len sequence number of
+    # processes
+    if size < numcores:
+        numcores = size
 
-  return run_tasks(procs, err_q, out_q, numcores)
+    # group sequence into numcores-worth of chunks
+    sequence = np.array_split(sequence, numcores)
+
+    procs = [multiprocessing.Process(
+                target=worker,
+                args=(func, ii, chunk, out_q, err_q, lock, tqdm))
+             for ii, chunk in enumerate(tqdm(sequence, desc='Master Loop'))]
+
+    return run_tasks(procs, err_q, out_q, numcores, size, tqdm=tqdm)
+# /def
 
 
 if __name__ == "__main__":
