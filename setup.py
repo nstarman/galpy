@@ -8,6 +8,8 @@ import os, os.path
 import platform
 import subprocess
 import glob
+
+
 PY3= sys.version > '3'
 WIN32= platform.system() == 'Windows'
 no_compiler = False  # Flag for cases where we are sure there is no compiler exists in user's system
@@ -92,6 +94,20 @@ except ValueError:
 else:
     del sys.argv[interppotential_ext_pos]
     interppotential_ext= True
+
+#Option to use Intel compilers
+try:
+    compiler_option_pos = ['--compiler=' in opt for opt in sys.argv]\
+        .index(True)
+except ValueError:
+    use_intel_compiler= False
+else:
+    use_intel_compiler= 'intel' in sys.argv[compiler_option_pos].split('=')[1]
+
+if use_intel_compiler and not WIN32:
+    import numpy.distutils.intelccompiler
+elif use_intel_compiler and WIN32:
+    import __intelcompiler
 
 #code to check the GSL version; list cmd w/ shell=True only works on Windows 
 # (https://docs.python.org/3/library/subprocess.html#converting-argument-sequence)
@@ -311,10 +327,12 @@ setup(name='galpy',
       packages=['galpy','galpy/orbit','galpy/potential',
                 'galpy/df','galpy/util','galpy/snapshot',
                 'galpy/actionAngle'],
-      package_data={'galpy/df':['data/*.sav'],
+      package_data={'galpy/orbit':['named_objects.json'],
+                    'galpy/df':['data/*.sav'],
                     "": ["README.rst","README.dev","LICENSE","AUTHORS.rst"]},
       include_package_data=True,
-      install_requires=['numpy>=1.7','scipy','matplotlib','pytest','six'],
+      install_requires=['numpy>=1.7','scipy','matplotlib','pytest','six',
+                        'future'],
       ext_modules=ext_modules if not no_compiler else None,
       classifiers=[
         "Development Status :: 6 - Mature",
@@ -327,6 +345,7 @@ setup(name='galpy',
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
         "Topic :: Scientific/Engineering :: Astronomy",
         "Topic :: Scientific/Engineering :: Physics"]
       )

@@ -338,7 +338,15 @@ The ``Orbit.from_name`` method attempts to resolve the name of the
 object in SIMBAD, and then use the observed coordinates found there to
 generate an ``Orbit`` instance. In order to query SIMBAD,
 ``Orbit.from_name`` requires the `astroquery
-<https://astroquery.readthedocs.io/>`_ package to be installed.
+<https://astroquery.readthedocs.io/>`_ package to be installed. A
+small number of objects, mainly Milky Way globular clusters and dwarf
+satellite galaxies, have their phase-space coordinates stored in a
+file that is part of galpy and for these objects the values from this
+file are used rather than querying SIMBAD. ``Orbit.from_name``
+supports tab completion in IPython/Jupyter for this list of objects
+
+.. image:: images/orbit-fromname-tabcomplete.png
+   :scale: 50 %
 
 .. TIP::
    Setting up an ``Orbit`` instance *without* arguments will return an Orbit instance representing the Sun: ``o= Orbit()``. This instance has physical units *turned on by default*, so methods will return outputs in physical units unless you ``o.turn_physical_off()``.
@@ -957,7 +965,7 @@ the estimations in one batch using the ``actionAngle`` interface, which takes co
 
 The above code calculates the parameters in roughly 100ms on a single core.
 
-**NEW in v1.4** Example: The orbit of the Large Magellanic Cloud in the presence of dynamical friction
+Example: The orbit of the Large Magellanic Cloud in the presence of dynamical friction
 --------------------------------------------------------------------------------------------------------
 
 As a further example of what you can do with galpy, we investigate the

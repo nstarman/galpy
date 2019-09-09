@@ -8,6 +8,23 @@ v1.5 (????-??-??)
 
 - Added support for 1D orbit integration in C (PR #354).
 
+- Added a (JSON) list with the phase-space coordinates of known
+  objects (mainly globular clusters and dwarf galaxies) for easy
+  Orbit.from_name initialization. For ease of use,
+  Orbit.from_name also supports tab completion for known objects in
+  this list in IPython/Jupyter (PR #392).
+
+- Added the galpy.potentials.mwpotentials module with various
+  Milky-Way-like potentials. Currently included are MWPotential2014,
+  McMillan17 for the potential from McMillan (2017), models 1 through
+  4 from Dehnen & Binney (1998), and the three models from Irrgang et
+  al. (2013). See PR #395.
+
+- Added potential.to_amuse to create an AMUSE
+  (http://www.amusecode.org) representation of any galpy potential,
+  allowing galpy potentials to be used as external gravitational
+  fields in AMUSE N-body simulations (#398).
+
 - Added potential.toVerticalPotential to convert any 3D potential to a
   1D potential at a given (R,phi) [generalizes RZToverticalPotential
   to non-axi potentials; RZToverticalPotential retained for backwards
@@ -41,14 +58,27 @@ v1.5 (????-??-??)
   attributes by giving them as an expresion (e.g.,
   orb.plot(d2='vR*R/r+vz*z/r')); requires the numexpr package.
 
+- Switched default Sun's vertical height zo parameter for Orbit
+  initialization to be the value of 20.8 pc from Bennett & Bovy
+  (2019).
+
 - Added IsothermalDiskPotential, the one-dimensional potential of an
   isothermal self-gravitating disk (sech^2 profile).
+
+- Added NumericalPotentialDerivativesMixin, a Mixin class to add
+  numerically-computed forces and second derivatives to any Potential
+  class, allowing new potentials to be implmented quickly by only
+  implementing the potential itself and obtaining all forces and
+  second derivatives numerically.
 
 - Added nemo_accname and nemo_accpars for the HernquistPotential,
   allowing it to be converted to NEMO.
 
 - DehnenSmoothWrapperPotential can now decay rather than grow a
   potential by setting ``decay=True``.
+
+- DehnenBarPotential and SpiralArmsPotential method now work for array
+  inputs (PR #388, by @webbjj).
   
 - Allow transformations of custom coordinate systems (positions
   and proper motions) to ICRS (ra,dec) and (pmra,pmdec).
@@ -58,6 +88,11 @@ v1.5 (????-??-??)
 
 - Add Python and C implementation of Dormand-Prince 8(5,3) integrator
   (#363 by Henry Leung)
+
+- Added function galpy.util.bovy_conversion.get_physical to obtain the
+  ro and vo parameters describing the conversion between physical and
+  internal units as a dictionary. This works for any galpy object or
+  lists of such objects.
 
 - Improved efficiency of requesting an integrated orbit at the exact
   times at which it was integrated (~10x faster now).

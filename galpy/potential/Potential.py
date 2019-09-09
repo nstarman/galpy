@@ -18,13 +18,17 @@ from __future__  import division, print_function
 import os, os.path
 import pickle
 from functools import wraps
+import warnings
 import math
 import numpy as nu
 from scipy import optimize, integrate
 import galpy.util.bovy_plot as plot
 from galpy.util import bovy_coords
-from galpy.util.bovy_conversion import velocity_in_kpcGyr, \
-    physical_conversion, potential_physical_input, freq_in_Gyr
+from ..util.bovy_conversion import velocity_in_kpcGyr, \
+    physical_conversion, potential_physical_input, freq_in_Gyr, \
+    get_physical
+from ..util import config
+from ..util import galpyWarning
 from .plotRotcurve import plotRotcurve, vcirc
 from .plotEscapecurve import _INF, plotEscapecurve
 from .DissipativeForce import DissipativeForce, _isDissipative
@@ -390,6 +394,8 @@ class Potential(Force):
 
            2014-01-29 - Written - Bovy (IAS)
 
+           2019-08-15 - Added spherical warning - Bovy (UofT)
+
         """
         if self.isNonAxi:
             raise NotImplementedError('mass for non-axisymmetric potentials is not currently supported')
@@ -399,6 +405,10 @@ class Potential(Force):
         except AttributeError:
             #Use numerical integration to get the mass
             if z is None:
+                warnings.warn("Vertical height z not specified for mass "
+                              "calculation...assuming spherical potential"
+                              " (for the mass of axisymmetric potentials"
+                              ", specify z)",galpyWarning)
                 return 4.*nu.pi\
                     *integrate.quad(lambda x: x**2.\
                                         *self.dens(x,0.,
@@ -672,7 +682,7 @@ class Potential(Force):
             return self._amp*self._phi2deriv(R,Z,phi=phi,t=t)
         except AttributeError: #pragma: no cover
             if self.isNonAxi:
-                raise PotentialError("'_phiforce' function not implemented for this non-axisymmetric potential")
+                raise PotentialError("'_phi2deriv' function not implemented for this non-axisymmetric potential")
             return 0.
 
     @potential_physical_input
@@ -710,7 +720,7 @@ class Potential(Force):
             return self._amp*self._Rphideriv(R,Z,phi=phi,t=t)
         except AttributeError: #pragma: no cover
             if self.isNonAxi:
-                raise PotentialError("'_phiforce' function not implemented for this non-axisymmetric potential")
+                raise PotentialError("'_Rphideriv' function not implemented for this non-axisymmetric potential")
             return 0.
 
     def toPlanar(self):
@@ -739,7 +749,7 @@ class Potential(Force):
         from galpy.potential import toPlanarPotential
         return toPlanarPotential(self)
 
-    def toVertical(self,R,phi=None):
+    def toVertical(self,R,phi=None,t0=0.):
         """
         NAME:
 
@@ -755,21 +765,19 @@ class Potential(Force):
 
            phi= (None) Galactocentric azimuth at which to create the vertical potential (can be Quantity); required for non-axisymmetric potential
 
+           t0= (0.) time at which to create the vertical potential (can be Quantity)
+
         OUTPUT:
 
-           linear (vertical) potential
+           linear (vertical) potential: Phi(z,phi,t) = Phi(R,z,phi,t)-Phi(R,0.,phi0,t0) where phi0 and t0 are the phi and t inputs
 
         HISTORY
 
            unknown
 
         """
-        if _APY_LOADED and isinstance(R,units.Quantity):
-            R= R.to(units.kpc).value/self._ro
-        if _APY_LOADED and isinstance(phi,units.Quantity):
-            phi= phi.to(units.rad).value
         from galpy.potential import toVerticalPotential
-        return toVerticalPotential(self,R,phi=phi)
+        return toVerticalPotential(self,R,phi=phi,t0=t0)
 
     def plot(self,t=0.,rmin=0.,rmax=1.5,nrs=21,zmin=-0.5,zmax=0.5,nzs=21,
              effective=False,Lz=None,phi=None,xy=False,
@@ -2889,6 +2897,52 @@ def nemo_accpars(Pot,vo,ro):
     else: #pragma: no cover 
         raise PotentialError("Input to 'nemo_accpars' is neither a Potential-instance or a list of such instances")
     
+def to_amuse(Pot,t=0.,tgalpy=0.,reverse=False,ro=None,vo=None): # pragma: no cover
+    """
+    NAME:
+    
+       to_amuse
+
+    PURPOSE:
+
+       Return an AMUSE representation of a galpy Potential or list of Potentials
+
+    INPUT:
+
+       Pot - Potential instance or list of such instances
+
+       t= (0.) Initial time in AMUSE (can be in internal galpy units or AMUSE units)
+
+       tgalpy= (0.) Initial time in galpy (can be in internal galpy units or AMUSE units); because AMUSE initial times have to be positive, this is useful to set if the initial time in galpy is negative
+
+       reverse= (False) set whether the galpy potential evolves forwards or backwards in time (default: False); because AMUSE can only integrate forward in time, this is useful to integrate backward in time in AMUSE
+
+       ro= (default taken from Pot) length unit in kpc
+
+       vo= (default taken from Pot) velocity unit in km/s       
+
+    OUTPUT:
+
+       AMUSE representation of Pot
+
+    HISTORY:
+
+       2019-08-04 - Written - Bovy (UofT)
+
+       2019-08-12 - Implemented actual function - Webb (UofT)
+
+    """
+    try:
+        from . import amuse
+    except ImportError:
+        raise ImportError("To obtain an AMUSE representation of a galpy potential, you need to have AMUSE installed")
+    Pot= flatten(Pot)
+    if ro is None or vo is None:
+        physical_dict= get_physical(Pot)
+        if ro is None: ro= physical_dict.get('ro')
+        if vo is None: vo= physical_dict.get('vo')
+    return amuse.galpy_profile(Pot,t=t,tgalpy=tgalpy,ro=ro,vo=vo)
+
 def turn_physical_off(Pot):
     """
     NAME:

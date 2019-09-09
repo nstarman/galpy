@@ -1,4 +1,5 @@
 import warnings
+from . import Force
 from . import Potential
 from . import planarPotential
 from . import linearPotential
@@ -45,6 +46,7 @@ from . import SphericalShellPotential
 from . import RingPotential
 from . import PerfectEllipsoidPotential
 from . import IsothermalDiskPotential
+from . import NumericalPotentialDerivativesMixin
 #
 # Functions
 #
@@ -103,9 +105,11 @@ scf_compute_coeffs = SCFPotential.scf_compute_coeffs
 rtide= Potential.rtide
 ttensor= Potential.ttensor
 flatten= Potential.flatten
+to_amuse= Potential.to_amuse
 #
 # Classes
 #
+Force= Force.Force
 Potential= Potential.Potential
 planarAxiPotential= planarPotential.planarAxiPotential
 planarPotential= planarPotential.planarPotential
@@ -155,19 +159,15 @@ SphericalShellPotential= SphericalShellPotential.SphericalShellPotential
 RingPotential= RingPotential.RingPotential
 PerfectEllipsoidPotential= PerfectEllipsoidPotential.PerfectEllipsoidPotential
 IsothermalDiskPotential= IsothermalDiskPotential.IsothermalDiskPotential
+NumericalPotentialDerivativesMixin= NumericalPotentialDerivativesMixin.NumericalPotentialDerivativesMixin
 #Wrappers
 DehnenSmoothWrapperPotential= DehnenSmoothWrapperPotential.DehnenSmoothWrapperPotential
 SolidBodyRotationWrapperPotential= SolidBodyRotationWrapperPotential.SolidBodyRotationWrapperPotential
 CorotatingRotationWrapperPotential= CorotatingRotationWrapperPotential.CorotatingRotationWrapperPotential
 GaussianAmplitudeWrapperPotential= GaussianAmplitudeWrapperPotential.GaussianAmplitudeWrapperPotential
 
-#
-# Constants
-#
-MWPotential= [MiyamotoNagaiPotential(a=0.5,b=0.0375,normalize=.6),
-              NFWPotential(a=4.5,normalize=.35),
-              HernquistPotential(a=0.6/8,normalize=0.05)]
-# See Table 1 in galpy paper: Bovy (2014)
-MWPotential2014= [PowerSphericalPotentialwCutoff(normalize=0.05,alpha=1.8,rc=1.9/8.),
-                  MiyamotoNagaiPotential(a=3./8.,b=0.28/8.,normalize=0.6),
-                  NFWPotential(a=2.,normalize=0.35)]
+# MW potential models, now in galpy.potential.mwpotentials, but keep these two
+# for tests, backwards compatibility, and convenience
+from . import mwpotentials
+MWPotential= mwpotentials._MWPotential
+MWPotential2014= mwpotentials.MWPotential2014
