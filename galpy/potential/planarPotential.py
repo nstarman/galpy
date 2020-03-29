@@ -4,6 +4,7 @@ import os
 import copy
 import pickle
 import numpy
+from funcsigs import signature
 from scipy import integrate
 from ..util import bovy_plot as plot
 from ..util import config
@@ -20,6 +21,28 @@ except ImportError:
     _APY_LOADED= False
 class planarPotential(object):
     """Class representing 2D (R,\phi) potentials"""
+
+    def __new__(cls, *args, **kwargs):
+        self = object.__new__(cls)  # a clean instance of cls
+        # signature
+        sig = signature(cls.__init__)
+        # don't include self
+        params = list(sig.parameters.values())[1:]
+        sig = sig.replace(parameters=params)
+        # correcting defaults for passed values
+        params = list(sig.parameters.values())
+        for i, param in enumerate(params):
+            if i < len(args):  # get arguments
+                params[i] = param.replace(default=args[i])
+            elif param.name in kwargs.keys():  # get kwargs
+                params[i] = param.replace(default=kwargs[param.name])
+        sig = sig.replace(parameters=params)  # apply to signature
+        self._init_args = sig
+        return self  # send to init
+
+    # def __getnewargs__(self):
+    #     return (self.__class__.__str__(self),)
+
     def __init__(self,amp=1.,ro=None,vo=None):
         self._amp= amp
         self.dim= 2
@@ -46,6 +69,22 @@ class planarPotential(object):
             self._vo= vo
             self._voSet= True
         return None
+
+    @property
+    def init_args(self):
+        """Arguments used to initialize Potential.
+        make bound argument for easy application
+        ba = sig.bind(**{n: p.default for n, p in sig.parameters.items()})
+        storing
+        allows any potential to be reconstructed
+        if want to use, do
+        >>> potential(*potential.init_args.args, **potential.init_args.kwargs)
+        """
+        # enforce shallow copy
+        sig = self._init_args
+        sig = sig.replace(parameters=list(sig.parameters.values()))
+        # return a bound argument
+        return sig.bind(**{n: p.default for n, p in sig.parameters.items()})
 
     def __mul__(self,b):
         """
@@ -126,6 +165,31 @@ class planarPotential(object):
             """compatible between potentials to be combined"""
         # If we get here, b has to be a list
         return b+[self]
+
+    def copy(self):
+        """
+        NAME:
+
+           copy
+
+        PURPOSE:
+
+           make a copy of this potential
+
+        INPUT:
+
+           (none)
+
+        OUTPUT:
+
+           copy of current potential
+
+        HISTORY:
+
+           2019-11-07 - Written - Starkman (UofT)
+
+        """
+        return self.__class__(*self.init_args.args, **self.init_args.kwargs)
 
     def turn_physical_off(self):
         """

@@ -16,7 +16,7 @@ no_compiler = False  # Flag for cases where we are sure there is no compiler exi
 
 long_description= ''
 previous_line= ''
-with open('README.md') as dfile:
+with open('README.rst') as dfile:
     for line in dfile:
         if not 'image' in line and not 'target' in line \
                 and not 'DETAILED' in line and not '**master**' in line \
@@ -216,7 +216,6 @@ setup(name='galpy',
       author_email='bovy@astro.utoronto.ca',
       license='New BSD',
       long_description=long_description,
-      long_description_content_type='text/markdown',
       url='http://github.com/jobovy/galpy',
       package_dir = {'galpy/': ''},
       packages=['galpy','galpy/orbit','galpy/potential',
@@ -224,10 +223,10 @@ setup(name='galpy',
                 'galpy/actionAngle'],
       package_data={'galpy/orbit':['named_objects.json'],
                     'galpy/df':['data/*.sav'],
-                    "": ["README.md","README.dev","LICENSE","AUTHORS.rst"]},
+                    "": ["README.rst","README.dev","LICENSE","AUTHORS.rst"]},
       include_package_data=True,
       install_requires=['numpy>=1.7','scipy','matplotlib','pytest','six',
-                        'future','setuptools'],
+                        'future', 'funcsigs'],
       ext_modules=ext_modules if not no_compiler else None,
       classifiers=[
         "Development Status :: 6 - Mature",

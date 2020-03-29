@@ -630,7 +630,7 @@ def bovy_dens2d(X,**kwargs):
                 thiszlabel=zlabel
             CB1.set_label(thiszlabel)
     if contours or retCumImage:
-        aspect= kwargs.get('aspect',None)
+        # aspect= kwargs.get('aspect',None)
         origin= kwargs.get('origin',None)
         if cntrmass:
             #Sum from the top down!
@@ -647,7 +647,7 @@ def bovy_dens2d(X,**kwargs):
                 cntrThis= ndimage.gaussian_filter(cntrThis,cntrSmooth,
                                                   mode='nearest')
             cont= pyplot.contour(cntrThis,levels,colors=cntrcolors,
-                                 linewidths=cntrlw,extent=extent,aspect=aspect,
+                                 linewidths=cntrlw,extent=extent,  # aspect=aspect,
                                  linestyles=cntrls,origin=origin)
             if cntrlabel:
                 pyplot.clabel(cont,fontsize=cntrlabelsize,
@@ -896,7 +896,7 @@ def scatterplot(x,y,*args,**kwargs):
         if isinstance(y,list): yrange=[numpy.amin(y),numpy.amax(y)]
         else: yrange=[y.min(),y.max()]
     ndata= len(x)
-    bins= kwargs.pop('bins',round(0.3*numpy.sqrt(ndata)))
+    bins= kwargs.pop('bins',int(round(0.3*numpy.sqrt(ndata))))
     weights= kwargs.pop('weights',None)
     levels= kwargs.pop('levels',special.erf(numpy.arange(1,4)/numpy.sqrt(2.)))
     aspect= kwargs.pop('aspect',(xrange[1]-xrange[0])/(yrange[1]-yrange[0]))
@@ -916,7 +916,7 @@ def scatterplot(x,y,*args,**kwargs):
     onedhistec= kwargs.pop('onedhistec','k')
     onedhistls= kwargs.pop('onedhistls','solid')
     onedhistlw= kwargs.pop('onedhistlw',None)
-    onedhistsbins= kwargs.pop('onedhistsbins',round(0.3*numpy.sqrt(ndata)))
+    onedhistsbins= kwargs.pop('onedhistsbins',int(round(0.3*numpy.sqrt(ndata))))
     overplot= kwargs.pop('overplot',False)
     gcf= kwargs.pop('gcf',False)
     cmap= kwargs.pop('cmap',cm.gist_yarg)
@@ -955,8 +955,10 @@ def scatterplot(x,y,*args,**kwargs):
         edges=kwargs['edges']
         kwargs.pop('edges')
     else:
-        hist, edges= numpy.histogramdd(data,bins=bins,range=[xrange,yrange],
-                                    weights=weights)
+        hist, edges= numpy.histogramdd(data,
+                                       bins=bins,
+                                       range=[xrange, yrange],
+                                       weights=weights)
     if contours:
         cumimage= bovy_dens2d(hist.T,contours=contours,levels=levels,
                               cntrmass=contours,cntrSmooth=cntrSmooth,
@@ -1002,7 +1004,7 @@ def scatterplot(x,y,*args,**kwargs):
     plotx= x[cums > levels[-1]]
     ploty= y[cums > levels[-1]]
     if not len(plotx) == 0:
-        if not weights == None:
+        if weights is not None:
             w8= weights[cums > levels[-1]]
             for ii in range(len(plotx)):
                 bovy_plot(plotx[ii],ploty[ii],overplot=True,
@@ -1017,7 +1019,7 @@ def scatterplot(x,y,*args,**kwargs):
             return None
     if onedhistx:
         histx, edges, patches= axHistx.hist(x,bins=onedhistsbins,
-                                            normed=onedhistxnormed,
+                                            density=onedhistxnormed,
                                             weights=onedhistxweights,
                                             histtype=onedhisttype,
                                             range=sorted(xrange),
@@ -1028,7 +1030,7 @@ def scatterplot(x,y,*args,**kwargs):
         histy, edges, patches= axHisty.hist(y,bins=onedhistsbins,
                                             orientation='horizontal',
                                             weights=onedhistyweights,
-                                            normed=onedhistynormed,
+                                            density=onedhistynormed,
                                             histtype=onedhisttype,
                                             range=sorted(yrange),
                                             color=onedhistcolor,fc=onedhistfc,
@@ -1046,6 +1048,7 @@ def scatterplot(x,y,*args,**kwargs):
         return (axScatter,axHistx,axHisty)
     else:
         return None
+
 
 def _add_axislabels(xlabel,ylabel):
     """
