@@ -50,3 +50,4 @@ galpy/df/data/dfcorrection*.sav
 build/
 dist/
 galpy.egg-info/
+.DS_Store
