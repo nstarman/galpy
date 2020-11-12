@@ -51,6 +51,7 @@ from . import HomogeneousSpherePotential
 from . import interpSphericalPotential
 from . import TriaxialGaussianPotential
 from . import KingPotential
+from .composite_potential import CompositePotential
 #
 # Functions
 #

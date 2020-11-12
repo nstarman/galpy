@@ -1,4 +1,5 @@
 import os, os.path
+from contextlib import contextmanager
 try:
     import configparser
 except: # pragma: no cover
@@ -14,6 +15,7 @@ default_configuration= {'normalization': {'ro':'8.',
                         'astropy': {'astropy-units':'False',
                                     'astropy-coords':'True'},
                         'plot': {'seaborn-bovy-defaults':'False'},
+                        'potential': {'merge': 'rename'},
                         'warnings': {'verbose':'False'}}
 default_filename= os.path.join(os.path.expanduser('~'),'.galpyrc')
 def check_config(configuration):
@@ -89,3 +91,32 @@ def set_vo(vo):
     if _APY_LOADED and isinstance(vo,units.Quantity):
         vo= vo.to(units.km/units.s).value
     __config__.set('normalization','vo',str(vo))
+
+
+def set_merge_strategy(strategy):
+    """
+    NAME:
+       set_merge_strategy
+    PURPOSE:
+       set the global configuration value of merge strategy
+       for creating composite potentials
+    INPUT:
+       strategy - str
+           one of: overwrite, rename, merge
+    OUTPUT:
+       (none)
+    HISTORY:
+       2020-11-11 - Written - Nathaniel (UofT)
+    """
+    __config__.set('potential', 'merge', str(strategy))
+
+
+@contextmanager
+def merge_strategy(strategy):
+    """Context-manager for merge strategy."""
+    old_strategy = __config__.get('potential', 'merge', str(strategy))
+    set_merge_strategy(strategy)
+    try:
+        yield
+    finally:
+        set_merge_strategy(old_strategy)
